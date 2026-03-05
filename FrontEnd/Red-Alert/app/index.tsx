@@ -34,6 +34,7 @@ export default function LoginScreen() {
 export default function App() {
   return (
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     <>
       <StatusBar style="light" />
       
@@ -92,6 +93,8 @@ export default function App() {
   );
 }
 =======
+=======
+>>>>>>> Stashed changes
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <KeyboardAvoidingView 
@@ -188,5 +191,9 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
   footerText: { color: '#888', fontSize: 15 },
   signupText: { color: '#ff4444', fontSize: 15, fontWeight: 'bold' },
+<<<<<<< Updated upstream
+});
+>>>>>>> Stashed changes
+=======
 });
 >>>>>>> Stashed changes
