@@ -1,7 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { router } from 'expo-router';
 
 export default function UserScreen() {
+  const handleLogout = () => {
+    Alert.alert(
+      "ยืนยันการออกจากระบบ",
+      "คุณต้องการออกจากระบบ Red Alert ใช่หรือไม่?",
+      [
+        { text: "ยกเลิก", style: "cancel" },
+        { 
+          text: "ออกจากระบบ", 
+          style: "destructive", 
+          onPress: () => router.replace('/')
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.profileSection}>
@@ -22,7 +38,7 @@ export default function UserScreen() {
         </TouchableOpacity>
       </View>
       
-      <TouchableOpacity style={styles.logoutButton}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
     </View>

@@ -32,7 +32,7 @@ export default function TabLayout() {
             
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginLeft: -6 }}
-              onPress={() => router.replace('/')} 
+              onPress={() => router.replace('../houses')}
             >
               <Ionicons name="chevron-back" size={22} color="#ff4444" />
               <Text style={{ color: '#ff4444', fontSize: 16, fontWeight: 'bold' }}>
