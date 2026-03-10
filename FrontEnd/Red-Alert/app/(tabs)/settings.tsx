@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SensorContext } from './_layout';
 
 interface SensorItem {
   id: string;
@@ -9,56 +10,40 @@ interface SensorItem {
 
 export default function SettingsScreen() {
   // จำลองข้อมูลเซนเซอร์ที่มีในระบบ
-  const [sensors, setSensors] = useState<SensorItem[]>([
-    { id: 'SN-ESP32-001', name: 'Kitchen Sensor' },
-    { id: 'SN-ESP32-002', name: 'Bedroom Sensor' },
-  ]);
+  const { sensors, setSensors } = useContext(SensorContext);
 
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
-  
   const [formData, setFormData] = useState({ id: '', name: '' });
-
 
   const handleDelete = (id: string) => {
     Alert.alert('ยืนยันการลบ', 'ต้องการลบเซนเซอร์นี้ใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
       { text: 'ลบ', style: 'destructive', onPress: () => {
-        setSensors(sensors.filter(s => s.id !== id));
+        setSensors(sensors.filter((s: any) => s.id !== id));
       }}
     ]);
   };
 
   const handleSaveAdd = () => {
-    if (!formData.id.trim() || !formData.name.trim()) {
-      Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอก ID และ ชื่อให้ครบ');
-      return;
-    }
-    if (sensors.some(s => s.id === formData.id.trim())) {
-      Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
-      return;
-    }
-    setSensors([...sensors, { id: formData.id.trim(), name: formData.name.trim() }]);
+    if (!formData.id.trim() || !formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอก ID และ ชื่อให้ครบ');
+    if (sensors.some((s: any) => s.id === formData.id.trim())) return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
+    
+    setSensors([...sensors, { 
+      id: formData.id.trim(), 
+      name: formData.name.trim(),
+      status: 'Normal', temp: 28, gas: 50
+    }]);
     setCurrentView('list');
   };
 
   const handleSaveEdit = () => {
-    if (!formData.name.trim()) {
-      Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอกชื่อเซนเซอร์');
-      return;
-    }
-    setSensors(sensors.map(s => s.id === formData.id ? { ...s, name: formData.name.trim() } : s));
-    setCurrentView('list'); 
+    if (!formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอกชื่อเซนเซอร์');
+    setSensors(sensors.map((s: any) => s.id === formData.id ? { ...s, name: formData.name.trim() } : s));
+    setCurrentView('list');
   };
 
-  const openEditForm = (sensor: SensorItem) => {
-    setFormData({ id: sensor.id, name: sensor.name });
-    setCurrentView('edit');
-  };
-
-  const openAddForm = () => {
-    setFormData({ id: '', name: '' });
-    setCurrentView('add');
-  };
+  const openEditForm = (sensor: any) => { setFormData({ id: sensor.id, name: sensor.name }); setCurrentView('edit'); };
+  const openAddForm = () => { setFormData({ id: '', name: '' }); setCurrentView('add'); };
 
   if (currentView === 'list') {
     return (
@@ -70,7 +55,6 @@ export default function SettingsScreen() {
             <Text style={styles.addBtnText}> Add</Text>
           </TouchableOpacity>
         </View>
-
         <FlatList
           data={sensors}
           keyExtractor={(item) => item.id}
@@ -97,9 +81,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-    >
+    <KeyboardAvoidingView style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentView('list')}>
         <Ionicons name="chevron-back" size={24} color="#ff4444" />
         <Text style={styles.backBtnText}>Back</Text>
@@ -150,14 +132,12 @@ const styles = StyleSheet.create({
   addBtn: { flexDirection: 'row', backgroundColor: '#ff4444', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, alignItems: 'center' },
   addBtnText: { color: '#fff', fontWeight: 'bold' },
   emptyText: { color: '#888', textAlign: 'center', marginTop: 30 },
-  
   sensorCard: { backgroundColor: '#1e1e1e', padding: 18, borderRadius: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeftWidth: 4, borderLeftColor: '#ff4444' },
   sensorInfo: { flex: 1 },
   sensorName: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
   sensorIdLabel: { color: '#888', fontSize: 13 },
   actionIcons: { flexDirection: 'row', gap: 15 },
   iconBtn: { padding: 5 },
-
   backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginLeft: -5 },
   backBtnText: { color: '#ff4444', fontSize: 16, fontWeight: 'bold', marginLeft: 5 },
   formContainer: { backgroundColor: '#1e1e1e', padding: 20, borderRadius: 15 },
