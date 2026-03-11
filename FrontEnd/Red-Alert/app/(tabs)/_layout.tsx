@@ -5,14 +5,26 @@ import { TouchableOpacity, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const SensorContext = createContext<any>(null);
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+
+  // State เซนเซอร์
   const [sensors, setSensors] = useState([
     { id: 'SN-001', name: 'Kitchen Sensor', status: 'Cooking', temp: 42, gas: 350 }
   ]);
 
+  // State เก็บ Logs
+  const [logs, setLogs] = useState([
+    {
+      id: '1', type: 'warning', title: 'Cooking Smoke Detected', 
+      room: 'Kitchen Sensor', timestamp: 'Today, 10:42 AM', 
+      details: 'Moderate smoke detected. AI classified as cooking.'
+    }
+  ]);
+
   return (
-    <SensorContext.Provider value={{ sensors, setSensors }}>
+    <SensorContext.Provider value={{ sensors, setSensors, logs, setLogs }}>
       <Tabs
         screenOptions={{
           tabBarStyle: { backgroundColor: '#1e1e1e', borderTopColor: '#333', height: 60, paddingBottom: 8, paddingTop: 8 },

@@ -3,14 +3,8 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, K
 import { Ionicons } from '@expo/vector-icons';
 import { SensorContext } from './_layout';
 
-interface SensorItem {
-  id: string;
-  name: string;
-}
-
 export default function SettingsScreen() {
-  // จำลองข้อมูลเซนเซอร์ที่มีในระบบ
-  const { sensors, setSensors } = useContext(SensorContext);
+  const { sensors, setSensors, logs, setLogs } = useContext(SensorContext);
 
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
   const [formData, setFormData] = useState({ id: '', name: '' });
@@ -19,7 +13,17 @@ export default function SettingsScreen() {
     Alert.alert('ยืนยันการลบ', 'ต้องการลบเซนเซอร์นี้ใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
       { text: 'ลบ', style: 'destructive', onPress: () => {
+        // หาชื่อเซนเซอร์ที่จะโดนลบ
+        const sensorName = sensors.find((s:any) => s.id === id)?.name || 'Unknown';
         setSensors(sensors.filter((s: any) => s.id !== id));
+        
+        // บันทึกประวัติการลบลงไปใน Log นำไปต่อหน้าข้อมูลเก่า
+        const newLog = {
+          id: Date.now().toString(), type: 'info', title: 'Sensor Removed', 
+          room: sensorName, timestamp: new Date().toLocaleTimeString(), 
+          details: `Device ID ${id} was removed from the system.`
+        };
+        setLogs([newLog, ...logs]);
       }}
     ]);
   };
@@ -28,11 +32,16 @@ export default function SettingsScreen() {
     if (!formData.id.trim() || !formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอก ID และ ชื่อให้ครบ');
     if (sensors.some((s: any) => s.id === formData.id.trim())) return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
     
-    setSensors([...sensors, { 
-      id: formData.id.trim(), 
-      name: formData.name.trim(),
-      status: 'Normal', temp: 28, gas: 50
-    }]);
+    setSensors([...sensors, { id: formData.id.trim(), name: formData.name.trim(), status: 'Normal', temp: 28, gas: 50 }]);
+    
+    // บันทึกประวัติการเพิ่มลงไปใน Log
+    const newLog = {
+      id: Date.now().toString(), type: 'info', title: 'Sensor Added', 
+      room: formData.name.trim(), timestamp: new Date().toLocaleTimeString(), 
+      details: `Device ID ${formData.id.trim()} was successfully connected.`
+    };
+    setLogs([newLog, ...logs]); // เอา log ใหม่ไว้บนสุด
+    
     setCurrentView('list');
   };
 
@@ -49,7 +58,7 @@ export default function SettingsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>📡 Connected Devices</Text>
+          <Text style={styles.title}>Connected Devices</Text>
           <TouchableOpacity style={styles.addBtn} onPress={openAddForm}>
             <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.addBtnText}> Add</Text>
@@ -81,44 +90,19 @@ export default function SettingsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentView('list')}>
         <Ionicons name="chevron-back" size={24} color="#ff4444" />
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
-
       <View style={styles.formContainer}>
-        <Text style={styles.formHeader}>
-          {currentView === 'add' ? '➕ Add New Device' : 'Edit Device'}
-        </Text>
-
+        <Text style={styles.formHeader}>{currentView === 'add' ? 'Add New Device' : 'Edit Device'}</Text>
         <Text style={styles.label}>Sensor ID {currentView === 'edit' && '(ไม่สามารถแก้ไขได้)'}</Text>
-        <TextInput 
-          style={[styles.input, currentView === 'edit' && styles.disabledInput]} 
-          placeholder="เช่น SN-1234" 
-          placeholderTextColor="#666" 
-          value={formData.id} 
-          onChangeText={(text) => setFormData({ ...formData, id: text })} 
-          editable={currentView === 'add'}
-        />
-        
+        <TextInput style={[styles.input, currentView === 'edit' && styles.disabledInput]} placeholder="เช่น SN-1234" placeholderTextColor="#666" value={formData.id} onChangeText={(text) => setFormData({ ...formData, id: text })} editable={currentView === 'add'} />
         <Text style={styles.label}>Sensor Name (ชื่อเรียก)</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="เช่น ห้องครัว" 
-          placeholderTextColor="#666" 
-          value={formData.name} 
-          onChangeText={(text) => setFormData({ ...formData, name: text })} 
-          autoFocus={currentView === 'edit'}
-        />
-        
-        <TouchableOpacity 
-          style={styles.saveButton} 
-          onPress={currentView === 'add' ? handleSaveAdd : handleSaveEdit}
-        >
-          <Text style={styles.saveButtonText}>
-            {currentView === 'add' ? 'Save Sensor' : 'Update Name'}
-          </Text>
+        <TextInput style={styles.input} placeholder="เช่น ห้องครัว" placeholderTextColor="#666" value={formData.name} onChangeText={(text) => setFormData({ ...formData, name: text })} autoFocus={currentView === 'edit'} />
+        <TouchableOpacity style={styles.saveButton} onPress={currentView === 'add' ? handleSaveAdd : handleSaveEdit}>
+          <Text style={styles.saveButtonText}>{currentView === 'add' ? 'Save Sensor' : 'Update Name'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
