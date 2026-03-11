@@ -5,7 +5,6 @@ import { SensorContext } from './_layout';
 
 export default function DashboardScreen() {
   const { sensors } = useContext(SensorContext);
-  
   const [activeTab, setActiveTab] = useState(sensors[0]?.id || null);
   const [pulseAnim] = useState(new Animated.Value(1));
 
@@ -48,7 +47,7 @@ export default function DashboardScreen() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'Normal': return { color: '#2ecc71', icon: 'shield-checkmark', text: 'SAFE & CLEAR' };
-      case 'Cooking': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING SMOKE' };
+      case 'Cooking': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING' };
       case 'Danger': return { color: '#ff4444', icon: 'warning', text: 'FIRE / GAS LEAK' };
       default: return { color: '#888', icon: 'help-circle', text: 'UNKNOWN' };
     }
