@@ -1,20 +1,10 @@
 import express from 'express';
-import { prisma } from "../lib/prisma"
- 
-const app = express();
-const port = process.env.PORT || 2077;
 
-app.use(express.json());
+const router = express.Router();
 
-app.get('/', (req, res) => {
-    res.send('From API Port: 2077')
-});
-
-app.post('/register/users', (req, res) => {
-    const newUser = req.body
+router.get("/", (req, res) => {
+    res.send("Test from controllers Say hi");
     
-})
-
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost${port}`);
 });
+
+export default router;
