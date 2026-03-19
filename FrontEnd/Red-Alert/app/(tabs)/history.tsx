@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SensorContext } from './_layout';
+import { AppContext } from '../_layout';
 
 export default function HistoryScreen() {
   // ดึงประวัติจากส่วนกลาง
-  const { logs, setLogs } = useContext(SensorContext);
+  const { logs, setLogs } = useContext(AppContext);
 
   const getLogStyle = (type: string) => {
     switch (type) {

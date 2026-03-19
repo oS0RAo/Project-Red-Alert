@@ -1,24 +1,22 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Dimensions, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SensorContext } from './_layout'; 
+import { AppContext } from '../_layout';
 
 export default function DashboardScreen() {
-  const { sensors } = useContext(SensorContext);
+  const { sensors } = useContext(AppContext);
+  const { userProfile } = useContext(AppContext);
+  
   const [activeTab, setActiveTab] = useState(sensors[0]?.id || null);
   const [pulseAnim] = useState(new Animated.Value(1));
 
-  // เช็คกรณีเซนเซอร์โดนลบ
   useEffect(() => {
     if (sensors.length > 0 && !sensors.find((s: any) => s.id === activeTab)) {
       setActiveTab(sensors[0].id);
     }
   }, [sensors, activeTab]);
 
-  // หาข้อมูลเซนเซอร์ กรณีไม่มีเซนเซอร์เลย currentSensor จะเป็น null
-  const currentSensor = sensors.length > 0 
-    ? (sensors.find((s: any) => s.id === activeTab) || sensors[0]) 
-    : null;
+  const currentSensor = sensors.length > 0 ? (sensors.find((s: any) => s.id === activeTab) || sensors[0]) : null;
 
   useEffect(() => {
     if (currentSensor?.status === 'Danger') {
@@ -33,13 +31,16 @@ export default function DashboardScreen() {
     }
   }, [currentSensor?.status, pulseAnim]);
 
+  const handleEmergencyCall = () => {
+    const phone = userProfile.emergencyPhone || '199';
+    Linking.openURL(`tel:${phone}`);
+  };
+
   if (!sensors || sensors.length === 0 || !currentSensor) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <Ionicons name="hardware-chip-outline" size={80} color="#333" />
-        <Text style={{ color: '#888', fontSize: 18, marginTop: 15, textAlign: 'center' }}>
-          No connected devices.{"\n"}Please add a sensor in the Settings tab.
-        </Text>
+        <Text style={{ color: '#888', fontSize: 18, marginTop: 15, textAlign: 'center' }}>No connected devices.{"\n"}Please add a sensor in the Settings tab.</Text>
       </View>
     );
   }
@@ -47,24 +48,24 @@ export default function DashboardScreen() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'Normal': return { color: '#2ecc71', icon: 'shield-checkmark', text: 'SAFE & CLEAR' };
-      case 'Cooking': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING' };
+      case 'Cooking': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING SMOKE' };
       case 'Danger': return { color: '#ff4444', icon: 'warning', text: 'FIRE / GAS LEAK' };
+      case 'Waiting': return { color: '#3498db', icon: 'sync', text: 'NO DATA' };
       default: return { color: '#888', icon: 'help-circle', text: 'UNKNOWN' };
     }
   };
 
   const statusConfig = getStatusConfig(currentSensor.status);
+  
+  // เช็คว่าเป็นสถานะรอข้อมูลไหม
+  const isWaiting = currentSensor.status === 'Waiting';
 
   return (
     <View style={styles.container}>
       <View style={styles.roomSelectorContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roomScroll}>
           {sensors.map((sensor: any) => (
-            <TouchableOpacity 
-              key={sensor.id} 
-              style={[styles.roomTab, activeTab === sensor.id && styles.roomTabActive, sensor.status === 'Danger' && { borderColor: '#ff4444', borderWidth: 1 }]}
-              onPress={() => setActiveTab(sensor.id)}
-            >
+            <TouchableOpacity key={sensor.id} style={[styles.roomTab, activeTab === sensor.id && styles.roomTabActive, sensor.status === 'Danger' && { borderColor: '#ff4444', borderWidth: 1 }]} onPress={() => setActiveTab(sensor.id)}>
               <Text style={[styles.roomTabText, activeTab === sensor.id && styles.roomTabTextActive]}>{sensor.name}</Text>
               {sensor.status === 'Danger' && <View style={styles.dangerDot} />}
             </TouchableOpacity>
@@ -77,36 +78,39 @@ export default function DashboardScreen() {
           <Animated.View style={[styles.statusCircle, { borderColor: statusConfig.color, shadowColor: statusConfig.color }, currentSensor.status === 'Danger' && { transform: [{ scale: pulseAnim }] }]}>
             <Ionicons name={statusConfig.icon as any} size={60} color={statusConfig.color} />
             <Text style={[styles.statusMainText, { color: statusConfig.color }]}>{statusConfig.text}</Text>
+            <Text style={styles.statusSubText}>AI Classification</Text>
           </Animated.View>
         </View>
 
         <View style={styles.dataGrid}>
+          {/* อุณหภูมิ */}
           <View style={styles.dataCard}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="thermometer" size={20} color="#ff7675" />
-              <Text style={styles.cardTitle}>Temperature</Text>
-            </View>
-            <Text style={styles.dataValue}>{currentSensor.temp}<Text style={styles.dataUnit}>°C</Text></Text>
+            <View style={styles.cardHeader}><Ionicons name="thermometer" size={20} color={isWaiting ? '#666' : '#ff7675'} /><Text style={styles.cardTitle}>Temperature</Text></View>
+            <Text style={styles.dataValue}>{isWaiting ? '-- ' : currentSensor.temp}<Text style={styles.dataUnit}>°C</Text></Text>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${Math.min(currentSensor.temp * 1.5, 100)}%`, backgroundColor: currentSensor.temp > 50 ? '#ff4444' : '#2ecc71' }]} />
+              <View style={[styles.progressBarFill, { 
+                width: `${isWaiting ? 0 : Math.min(currentSensor.temp * 1.5, 100)}%`, 
+                backgroundColor: currentSensor.temp > 50 && !isWaiting ? '#ff4444' : '#2ecc71' 
+              }]} />
             </View>
           </View>
 
+          {/* แก๊ส */}
           <View style={styles.dataCard}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="cloud-outline" size={20} color="#74b9ff" />
-              <Text style={styles.cardTitle}>Gas Level</Text>
-            </View>
-            <Text style={styles.dataValue}>{currentSensor.gas}<Text style={styles.dataUnit}> PPM</Text></Text>
+            <View style={styles.cardHeader}><Ionicons name="cloud-outline" size={20} color={isWaiting ? '#666' : '#74b9ff'} /><Text style={styles.cardTitle}>Gas Level</Text></View>
+            <Text style={styles.dataValue}>{isWaiting ? '-- ' : currentSensor.gas}<Text style={styles.dataUnit}> PPM</Text></Text>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${Math.min(currentSensor.gas / 10, 100)}%`, backgroundColor: currentSensor.gas > 400 ? '#ff4444' : '#2ecc71' }]} />
+              <View style={[styles.progressBarFill, { 
+                width: `${isWaiting ? 0 : Math.min(currentSensor.gas / 10, 100)}%`, 
+                backgroundColor: currentSensor.gas > 400 && !isWaiting ? '#ff4444' : '#2ecc71' 
+              }]} />
             </View>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.emergencyButton}>
+        <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
           <Ionicons name="call" size={24} color="#fff" />
-          <Text style={styles.emergencyText}>CALL EMERGENCY (199)</Text>
+          <Text style={styles.emergencyText}>CALL EMERGENCY ({userProfile.emergencyPhone})</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
