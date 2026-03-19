@@ -1,10 +1,10 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SensorContext } from './_layout';
+import { AppContext } from '../_layout';
 
 export default function SettingsScreen() {
-  const { sensors, setSensors, logs, setLogs } = useContext(SensorContext);
+  const { sensors, setSensors, logs, setLogs } = useContext(AppContext);
 
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
   const [formData, setFormData] = useState({ id: '', name: '' });
@@ -32,7 +32,13 @@ export default function SettingsScreen() {
     if (!formData.id.trim() || !formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอก ID และ ชื่อให้ครบ');
     if (sensors.some((s: any) => s.id === formData.id.trim())) return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
     
-    setSensors([...sensors, { id: formData.id.trim(), name: formData.name.trim(), status: 'Normal', temp: 28, gas: 50 }]);
+    setSensors([...sensors, { 
+      id: formData.id.trim(), 
+      name: formData.name.trim(), 
+      status: 'Waiting', // รอรับข้อมูล
+      temp: 0,           // ค่าว่าง
+      gas: 0             // ค่าว่าง
+    }]);
     
     // บันทึกประวัติการเพิ่มลงไปใน Log
     const newLog = {
