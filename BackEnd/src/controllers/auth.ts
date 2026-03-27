@@ -4,6 +4,7 @@ export const register = (req: Request, res: Response) => {
     const { user, password, email } = req.body
     try {
         console.log(user, password, email);
+        res.json({ user, password, email });
     } catch (error) {
         res.status(500).json({ error: "fail" });
     }
