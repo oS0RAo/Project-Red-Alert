@@ -14,9 +14,20 @@ datasource db {
 
 model User {
   UserId          String        @id @default(uuid()) @db.Uuid
-  user            String     
+  fullName        String
   password        String        
   email           String        @unique
   createdAt       DateTime      @default(now())
   update          DateTime      @updatedAt
 }
+
+model Sensor {
+  SensorId        String        @id @default(uuid()) @db.Uuid
+  name            String        
+  type            String        
+  location        String        
+  createdAt       DateTime      @default(now())
+  update          DateTime      @updatedAt
+}
+
+
