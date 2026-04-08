@@ -1,8 +1,19 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../_layout';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+// Schema ล็อคเบอร์โทรศัพท์ (ห้ามเว้นว่าง, ต้องเป็นตัวเลขล้วน, ความยาวขั้นต่ำ 3 ตัว)
+const phoneSchema = z.object({
+  emergencyPhone: z.string()
+    .min(3, "เบอร์โทรฉุกเฉินสั้นเกินไป")
+    .regex(/^[0-9]+$/, "กรุณากรอกเฉพาะตัวเลขเท่านั้น"),
+});
+type PhoneFormValues = z.infer<typeof phoneSchema>;
 
 export default function UserScreen() {
   const { userProfile, setUserProfile, setHouses, setSensors, setLogs } = useContext(AppContext);
@@ -10,18 +21,26 @@ export default function UserScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'emergency' | 'notify'>('emergency');
 
-  // State ชั่วคราวเวลาพิมพ์แก้ในฟอร์ม
-  const [editPhone, setEditPhone] = useState(userProfile.emergencyPhone);
+  // State สำหรับหน้าตั้งค่าแจ้งเตือน
   const [pushNotify, setPushNotify] = useState(userProfile.pushNotify);
 
-  // ดึงตัวอักษรแรกของชื่อมาทำเป็นรูปโปรไฟล์
+  // Setup Form สำหรับเบอร์ฉุกเฉิน
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<PhoneFormValues>({
+    resolver: zodResolver(phoneSchema),
+    defaultValues: { emergencyPhone: userProfile.emergencyPhone }
+  });
+
+  // อัปเดตค่าเริ่มต้นให้ฟอร์มเวลา userProfile โหลดมาครั้งแรก
+  useEffect(() => {
+    reset({ emergencyPhone: userProfile.emergencyPhone });
+  }, [userProfile.emergencyPhone, reset]);
+
   const getInitial = () => userProfile.name ? userProfile.name.charAt(0).toUpperCase() : '?';
 
   const handleLogout = () => {
     Alert.alert("ยืนยันการออกจากระบบ", "คุณต้องการออกจากระบบ Red Alert ใช่หรือไม่?", [
       { text: "ยกเลิก", style: "cancel" },
       { text: "ออกจากระบบ", style: "destructive", onPress: () => {
-        // เคลียร์ข้อมูลทุกอย่างในคลังกลาง (Global State)
         setHouses([]);
         setSensors([]);
         setLogs([]);
@@ -32,15 +51,26 @@ export default function UserScreen() {
 
   const openModal = (type: 'emergency' | 'notify') => {
     setModalType(type);
-    setEditPhone(userProfile.emergencyPhone);
-    setPushNotify(userProfile.pushNotify);
+    if (type === 'emergency') {
+      reset({ emergencyPhone: userProfile.emergencyPhone }); // ดึงเบอร์ล่าสุดมาใส่ฟอร์ม
+    } else {
+      setPushNotify(userProfile.pushNotify); // ดึงค่าการแจ้งเตือนล่าสุด
+    }
     setModalVisible(true);
   };
 
-  const saveSettings = () => {
-    setUserProfile({ ...userProfile, emergencyPhone: editPhone, pushNotify });
+  // ฟังก์ชันเซฟเบอร์โทรจะถูกเรียกเมื่อผ่านกฎ Zod แล้ว
+  const onSavePhone = (data: PhoneFormValues) => {
+    setUserProfile({ ...userProfile, emergencyPhone: data.emergencyPhone });
     setModalVisible(false);
-    Alert.alert("Success", "บันทึกการตั้งค่าเรียบร้อยแล้ว!");
+    Alert.alert("Success", "อัปเดตเบอร์ฉุกเฉินเรียบร้อยแล้ว!");
+  };
+
+  // ฟังก์ชันเซฟการแจ้งเตือน
+  const saveNotifyConfig = () => {
+    setUserProfile({ ...userProfile, pushNotify });
+    setModalVisible(false);
+    Alert.alert("Success", "อัปเดตการตั้งค่าแจ้งเตือนเรียบร้อยแล้ว!");
   };
 
   return (
@@ -85,11 +115,24 @@ export default function UserScreen() {
             {modalType === 'emergency' ? (
               <View style={{ width: '100%' }}>
                 <Text style={styles.label}>Phone Number (เบอร์ฉุกเฉิน)</Text>
-                <TextInput 
-                  style={styles.input} 
-                  keyboardType="phone-pad"
-                  value={editPhone} 
-                  onChangeText={setEditPhone} 
+                
+                {/* ใช้ Controller ครอบช่องกรอกเบอร์โทร */}
+                <Controller
+                  control={control}
+                  name="emergencyPhone"
+                  render={({ field: { onChange, value } }) => (
+                    <>
+                      <TextInput 
+                        style={[styles.input, errors.emergencyPhone && styles.inputError]} 
+                        keyboardType="phone-pad"
+                        placeholder="เช่น 191, 199 หรือเบอร์มือถือ"
+                        placeholderTextColor="#666"
+                        value={value} 
+                        onChangeText={onChange} 
+                      />
+                      {errors.emergencyPhone && <Text style={styles.errorText}>{errors.emergencyPhone.message}</Text>}
+                    </>
+                  )}
                 />
               </View>
             ) : (
@@ -105,7 +148,12 @@ export default function UserScreen() {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.btnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={saveSettings}>
+              
+              {/* แยกว่าปุ่ม Save จะรันคำสั่งไหน ขึ้นอยู่กับประเภท Modal */}
+              <TouchableOpacity 
+                style={styles.saveBtn} 
+                onPress={modalType === 'emergency' ? handleSubmit(onSavePhone) : saveNotifyConfig}
+              >
                 <Text style={styles.btnText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -130,12 +178,13 @@ const styles = StyleSheet.create({
   menuValue: { color: '#888', fontSize: 14 },
   logoutButton: { backgroundColor: 'transparent', padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#ff4444', borderRadius: 10, marginBottom: 20 },
   logoutText: { color: '#ff4444', fontSize: 16, fontWeight: 'bold' },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#1e1e1e', padding: 25, borderTopLeftRadius: 25, borderTopRightRadius: 25, alignItems: 'flex-start' },
   modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 25 },
   label: { color: '#aaa', fontSize: 14, marginBottom: 8 },
-  input: { backgroundColor: '#2a2a2a', width: '100%', borderRadius: 10, padding: 15, color: '#fff', fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#333' },
+  input: { backgroundColor: '#2a2a2a', width: '100%', borderRadius: 10, padding: 15, color: '#fff', fontSize: 16, marginBottom: 10, borderWidth: 1, borderColor: '#333' },
+  inputError: { borderColor: '#ff4444', backgroundColor: 'rgba(255, 68, 68, 0.05)' },
+  errorText: { color: '#ff4444', fontSize: 12, marginBottom: 15, marginLeft: 5 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25, width: '100%' },
   switchLabel: { color: '#fff', fontSize: 16 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 10, marginBottom: 20 },

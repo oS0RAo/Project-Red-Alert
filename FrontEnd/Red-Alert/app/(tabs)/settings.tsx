@@ -2,22 +2,33 @@ import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../_layout';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const sensorSchema = z.object({
+  id: z.string().min(1, "กรุณากรอก Sensor ID"),
+  name: z.string().min(1, "กรุณาตั้งชื่ออุปกรณ์"),
+});
+type SensorFormValues = z.infer<typeof sensorSchema>;
 
 export default function SettingsScreen() {
   const { sensors, setSensors, logs, setLogs } = useContext(AppContext);
-
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
-  const [formData, setFormData] = useState({ id: '', name: '' });
+
+  // Setup Form
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<SensorFormValues>({
+    resolver: zodResolver(sensorSchema),
+    defaultValues: { id: '', name: '' }
+  });
 
   const handleDelete = (id: string) => {
     Alert.alert('ยืนยันการลบ', 'ต้องการลบเซนเซอร์นี้ใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
       { text: 'ลบ', style: 'destructive', onPress: () => {
-        // หาชื่อเซนเซอร์ที่จะโดนลบ
         const sensorName = sensors.find((s:any) => s.id === id)?.name || 'Unknown';
         setSensors(sensors.filter((s: any) => s.id !== id));
         
-        // บันทึกประวัติการลบลงไปใน Log นำไปต่อหน้าข้อมูลเก่า
         const newLog = {
           id: Date.now().toString(), type: 'info', title: 'Sensor Removed', 
           room: sensorName, timestamp: new Date().toLocaleTimeString(), 
@@ -28,37 +39,37 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleSaveAdd = () => {
-    if (!formData.id.trim() || !formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอก ID และ ชื่อให้ครบ');
-    if (sensors.some((s: any) => s.id === formData.id.trim())) return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
-    
-    setSensors([...sensors, { 
-      id: formData.id.trim(), 
-      name: formData.name.trim(), 
-      status: 'Waiting', // รอรับข้อมูล
-      temp: 0,           // ค่าว่าง
-      gas: 0             // ค่าว่าง
-    }]);
-    
-    // บันทึกประวัติการเพิ่มลงไปใน Log
-    const newLog = {
-      id: Date.now().toString(), type: 'info', title: 'Sensor Added', 
-      room: formData.name.trim(), timestamp: new Date().toLocaleTimeString(), 
-      details: `Device ID ${formData.id.trim()} was successfully connected.`
-    };
-    setLogs([newLog, ...logs]); // เอา log ใหม่ไว้บนสุด
+  const onSubmit = (data: SensorFormValues) => {
+    if (currentView === 'add') {
+      // เช็คข้อมูลซ้ำ
+      if (sensors.some((s: any) => s.id === data.id.trim())) {
+        return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
+      }
+      setSensors([...sensors, { id: data.id.trim(), name: data.name.trim(), status: 'Waiting', temp: 0, gas: 0 }]);
+      
+      const newLog = {
+        id: Date.now().toString(), type: 'info', title: 'Sensor Added', 
+        room: data.name.trim(), timestamp: new Date().toLocaleTimeString(), 
+        details: `Device ID ${data.id.trim()} was successfully connected.`
+      };
+      setLogs([newLog, ...logs]);
+
+    } else if (currentView === 'edit') {
+      setSensors(sensors.map((s: any) => s.id === data.id ? { ...s, name: data.name.trim() } : s));
+    }
     
     setCurrentView('list');
   };
 
-  const handleSaveEdit = () => {
-    if (!formData.name.trim()) return Alert.alert('ข้อมูลไม่ครบ', 'กรุณากรอกชื่อเซนเซอร์');
-    setSensors(sensors.map((s: any) => s.id === formData.id ? { ...s, name: formData.name.trim() } : s));
-    setCurrentView('list');
+  const openAddForm = () => { 
+    reset({ id: '', name: '' }); // ล้างฟอร์ม
+    setCurrentView('add'); 
   };
 
-  const openEditForm = (sensor: any) => { setFormData({ id: sensor.id, name: sensor.name }); setCurrentView('edit'); };
-  const openAddForm = () => { setFormData({ id: '', name: '' }); setCurrentView('add'); };
+  const openEditForm = (sensor: any) => { 
+    reset({ id: sensor.id, name: sensor.name }); // ยัดข้อมูลเดิมลงฟอร์ม
+    setCurrentView('edit'); 
+  };
 
   if (currentView === 'list') {
     return (
@@ -101,13 +112,41 @@ export default function SettingsScreen() {
         <Ionicons name="chevron-back" size={24} color="#ff4444" />
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
+      
       <View style={styles.formContainer}>
         <Text style={styles.formHeader}>{currentView === 'add' ? 'Add New Device' : 'Edit Device'}</Text>
+        
         <Text style={styles.label}>Sensor ID {currentView === 'edit' && '(ไม่สามารถแก้ไขได้)'}</Text>
-        <TextInput style={[styles.input, currentView === 'edit' && styles.disabledInput]} placeholder="เช่น SN-1234" placeholderTextColor="#666" value={formData.id} onChangeText={(text) => setFormData({ ...formData, id: text })} editable={currentView === 'add'} />
+        <Controller control={control} name="id" render={({ field: { onChange, value } }) => (
+          <>
+            <TextInput 
+              style={[styles.input, currentView === 'edit' && styles.disabledInput, errors.id && styles.inputError]} 
+              placeholder="เช่น SN-1234" 
+              placeholderTextColor="#666" 
+              value={value} 
+              onChangeText={onChange} 
+              editable={currentView === 'add'} 
+            />
+            {errors.id && <Text style={styles.errorText}>{errors.id.message}</Text>}
+          </>
+        )} />
+        
         <Text style={styles.label}>Sensor Name (ชื่อเรียก)</Text>
-        <TextInput style={styles.input} placeholder="เช่น ห้องครัว" placeholderTextColor="#666" value={formData.name} onChangeText={(text) => setFormData({ ...formData, name: text })} autoFocus={currentView === 'edit'} />
-        <TouchableOpacity style={styles.saveButton} onPress={currentView === 'add' ? handleSaveAdd : handleSaveEdit}>
+        <Controller control={control} name="name" render={({ field: { onChange, value } }) => (
+          <>
+            <TextInput 
+              style={[styles.input, errors.name && styles.inputError]} 
+              placeholder="เช่น ห้องครัว" 
+              placeholderTextColor="#666" 
+              value={value} 
+              onChangeText={onChange} 
+              autoFocus={currentView === 'edit'} 
+            />
+            {errors.name && <Text style={styles.errorText}>{errors.name.message}</Text>}
+          </>
+        )} />
+        
+        <TouchableOpacity style={styles.saveButton} onPress={handleSubmit(onSubmit)}>
           <Text style={styles.saveButtonText}>{currentView === 'add' ? 'Save Sensor' : 'Update Name'}</Text>
         </TouchableOpacity>
       </View>
@@ -133,8 +172,10 @@ const styles = StyleSheet.create({
   formContainer: { backgroundColor: '#1e1e1e', padding: 20, borderRadius: 15 },
   formHeader: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
   label: { color: '#aaa', fontSize: 14, marginBottom: 8 },
-  input: { backgroundColor: '#2a2a2a', color: '#fff', padding: 15, borderRadius: 8, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#333' },
+  input: { backgroundColor: '#2a2a2a', color: '#fff', padding: 15, borderRadius: 8, fontSize: 16, marginBottom: 10, borderWidth: 1, borderColor: '#333' },
   disabledInput: { color: '#666', backgroundColor: '#181818', borderColor: '#222' },
+  inputError: { borderColor: '#ff4444', backgroundColor: 'rgba(255, 68, 68, 0.05)' },
+  errorText: { color: '#ff4444', fontSize: 12, marginBottom: 15, marginLeft: 5 },
   saveButton: { backgroundColor: '#2ecc71', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', letterSpacing: 1 },
 });
