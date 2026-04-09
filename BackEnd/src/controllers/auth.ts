@@ -31,12 +31,21 @@ export const register = async (req: Request, res: Response) => {
         const newUser = await prisma.user.create({
             data: userData,
             select: {
-                UserId: false,
+                UserId: true,
                 fullName: true,
                 email: true
             }
         });
-        res.status(201).json({ msg: "Register successfully"});
+        
+        const payload = { user: { UserId: newUser.UserId, email: newUser.email }};
+        const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1d' });
+        
+        res.status(201).json({ 
+            msg: "Register successfully",
+            user: payload.user,
+            token: token
+        });
+
     } catch (error) {
         console.log(error);
         res.status(400).json({ error: "Fail to register" });
@@ -59,7 +68,7 @@ export const login = async(req: Request, res: Response) => {
              })
         }
         const payload = { user: { UserId: user.UserId, email: user.email }};
-        const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '10m' });
+        const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1d' });
 
         // console.log(token);
         res.status(200).json({ user:payload.user, token: token });
