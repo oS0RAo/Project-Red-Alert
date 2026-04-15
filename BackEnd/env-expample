@@ -1,0 +1,4 @@
+DATABASE_URL=" your db path "
+JWT_SECRET=" your secret key "
+GEMINI_API_KEY=" your api key "
+PORT= your port 

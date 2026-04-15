@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma/client"
 }
 
 datasource db {
@@ -8,44 +8,80 @@ datasource db {
 }
 
 model User {
-  UserId    String   @id @default(uuid()) @db.Uuid
-  password  String
-  email     String   @unique
-  createdAt DateTime @default(now())
-  update    DateTime @updatedAt
-  fullName  String
-  houses    House[]
+  UserId          String    @id @default(uuid()) @db.Uuid
+  fullName        String
+  email           String    @unique
+  password        String
+  emergencyPhone  String?
+  pushNotify      Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updateAt        DateTime  @default(now()) @updatedAt
+
+  houses          House[]
+  notifications   Notification[]
 }
 
 model House {
-  HouseId   String   @id @default(uuid()) @db.Uuid
-  name      String   
-  address   String?
-  userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [UserId])
-  sensors   Sensor[]
-  createdAt DateTime @default(now())
-  update    DateTime @updatedAt
+  HouseId         String    @id @default(uuid()) @db.Uuid
+  name            String   
+  address         String?
+  createdAt       DateTime  @default(now())
+  updateAt        DateTime  @default(now()) @updatedAt
+  
+  userId          String    @db.Uuid
+  user            User      @relation(fields: [userId], references: [UserId])
+  sensors         Sensor[]
 }
 
 model Sensor {
-  SensorNumber String @id @default(uuid()) @db.Uuid
-  name         String
-  type         String
-  status       String
-  houseId      String   @db.Uuid
-  house        House   @relation(fields: [houseId], references: [HouseId])
-  createdAt    DateTime @default(now())
-  update       DateTime @updatedAt
-  eventLogs    EventLog[]
+  SensorNumber    String    @id @default(uuid()) @db.Uuid
+  name            String
+  type            String
+  status          String    @default("normal")
+  isActive        Boolean   @default(true)
+
+  createdAt       DateTime  @default(now())
+  updateAt        DateTime  @default(now()) @updatedAt
+  
+  houseId         String    @db.Uuid
+  house           House     @relation(fields: [houseId], references: [HouseId])
+  
+  sensorData      SensorData[]
+  eventLogs       EventLog[]
+}
+
+model SensorData {
+  SensorDataId    String    @id @default(uuid()) @db.Uuid
+  gas             Float?
+  temperature     Float?
+  humidity        Float?
+  smoke           Float?
+  
+  timestamp       DateTime  @default(now())
+  
+  sensorId        String    @db.Uuid
+  sensor          Sensor    @relation(fields: [sensorId], references: [SensorNumber])
 }
 
 model EventLog {
-  EventLogId   String   @id @default(uuid()) @db.Uuid
-  type         String
-  title        String
-  details      String
-  sensorId     String   @db.Uuid
-  sensor       Sensor?   @relation(fields: [sensorId], references: [SensorNumber])
-  createdAt    DateTime @default(now())
+  EventLogId      String    @id @default(uuid()) @db.Uuid
+  type            String
+  title           String
+  details         String
+  createdAt       DateTime  @default(now())
+  
+  sensorId        String?   @db.Uuid
+  sensor          Sensor?   @relation(fields: [sensorId], references: [SensorNumber])
+}
+
+model Notification {
+  NotificationId  String    @id @default(uuid()) @db.Uuid
+  type            String
+  title           String
+  details         String
+  isRead          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  
+  userId          String    @db.Uuid
+  user            User      @relation(fields: [userId], references: [UserId])
 }
