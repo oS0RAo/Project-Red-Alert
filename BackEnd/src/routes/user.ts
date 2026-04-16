@@ -1,9 +1,9 @@
-import  express  from "express";
-import { Request, Response } from "express";
-import { list, remove } from "../controllers/user";
+import express from "express";
+import { authMiddleware } from "../Middleware/auth.js";
+import { list, remove } from "../controllers/user.js";
 const router = express.Router();
 
-router.get('/users',list);
-router.delete('/users/:UserId',remove);
+router.get('/users', authMiddleware ,list);
+router.delete('/users/:UserId', authMiddleware, remove);
 
-module.exports = router
+export default router;

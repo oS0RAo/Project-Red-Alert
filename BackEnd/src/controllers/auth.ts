@@ -1,17 +1,16 @@
 import express, { Response, Request } from 'express';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '../../lib/prisma.js';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import { generateToken } from '../utils/jwt.js'; 
 
 
 dotenv.config();
-export const config = {
+const config = {
     jwtSecret: process.env.JWT_SECRET || "defaultSecretKey",
     port : process.env.PORT || 5000
 }
-
-
 export const register = async (req: Request, res: Response) => {
     try {
         const { fullName, password, email } = req.body;
@@ -31,38 +30,35 @@ export const register = async (req: Request, res: Response) => {
         const newUser = await prisma.user.create({
             data: userData,
             select: {
-                UserId: false,
+                UserId: true,
                 fullName: true,
                 email: true
             }
         });
-        res.status(201).json({ msg: "Register successfully"});
+        res.status(201).json({ 
+            msg: "Register successfully",
+            newUser: newUser
+        });
+
     } catch (error) {
         console.log(error);
         res.status(400).json({ error: "Fail to register" });
     }
 };
-
-export const login = async(req: Request, res: Response) => {
+export const login = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
-        const  user = await prisma.user.findUnique({ 
-            where: { email: email } 
-        });
-        if (!user) {
-            return res.status(401).json({ msg: "User not found" });
-        }
+        const  user = await prisma.user.findUnique({ where: { email: email } });
+        if (!user) return res.status(401).json({ msg: "Email or password is incorrect" });
+        
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ 
-                msg: "Password is incorrect"
-             })
-        }
-        const payload = { user: { UserId: user.UserId, email: user.email }};
-        const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '10m' });
+        if (!isMatch) return res.status(400).json({ msg: "Password is incorrect" });
+        const token = generateToken(user.UserId);
+
+        res.status(200).json({ token, user });
 
         // console.log(token);
-        res.status(200).json({ user:payload.user, token: token });
+        
     } catch (error) {
         console.log(error);
         res.status(400).json({ msg: "Fail to login" });
