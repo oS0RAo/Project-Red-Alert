@@ -14,12 +14,13 @@ config({ path: path.join(__dirname, "../.env") });
 const app = express();
 const port = process.env.PORT || 5000;
 const jwtSecret = process.env.JWT_SECRET;
+const geminiApiKey = process.env.GEMINI_API_KEY;
 
 app.use(cors());
 app.use(express.json());
 
 app.get("/test", (req, res) => {
-  res.send("Hello, From Prisma API!?");
+  res.send("Hello, From Prisma API Naraak mak mak!!!");
 });
 
 const routePath = path.join(__dirname, "routes");
