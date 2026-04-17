@@ -29,17 +29,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-<<<<<<< HEAD
-<<<<<<< HEAD
     "@prisma/adapter-pg": "^7.7.0",
-=======
     "@google/genai": "^1.50.1",
-    "@prisma/adapter-pg": "^7.5.0",
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-=======
-    "@google/genai": "^1.50.1",
-    "@prisma/adapter-pg": "^7.5.0",
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
     "@prisma/client": "^7.7.0",
     "@types/bcrypt": "^6.0.0",
     "bcrypt-ts": "^8.0.1",

@@ -28,33 +28,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 }
 
 export const registerMiddleware = (req: Request , res: Response, next: NextFunction) => {
-<<<<<<< HEAD
-<<<<<<< HEAD
+
     const { fullName, password, email } = req.body;
     if (!fullName || !password || !email) {
         return res.status(400).json({ error: "All fields are required" });
     } 
     next();
 }
-=======
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-    try {
-        const { fullName, password, email } = req.body;
-        const checkUser = false; // Replace with actual user lookup logic
-        if (!fullName || !password || !email) {
-            return res.status(400).json({ error: "All fields are required" });
-        } 
-        if (checkUser) {
-            return res.status(400).json({ error: "Email already exists" });
-        }
-        next();
-    } catch (error) {
-        console.log(error);
-        res.status(400).json({ error: "Fail to register" });
-    }
-} 
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
 
 export const loginMiddleware = (req: Request , res: Response, next: NextFunction) => {
     const { email, password } = req.body;

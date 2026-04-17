@@ -1,13 +1,7 @@
 generator client {
   provider = "prisma-client-js"
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
+
   output   = "../generated/prisma/client"
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-=======
-  output   = "../generated/prisma/client"
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
 }
 
 datasource db {
@@ -15,8 +9,6 @@ datasource db {
 }
 
 model User {
-<<<<<<< HEAD
-<<<<<<< HEAD
   id             String   @id @default(uuid()) @db.Uuid
   fullName       String
   email          String   @unique
@@ -76,126 +68,3 @@ model EventLog {
 
   createdAt   DateTime @default(now())
 }
-=======
-  UserId         String         @id @default(uuid()) @db.Uuid
-  password       String
-  email          String         @unique
-  createdAt      DateTime       @default(now())
-  fullName       String
-  emergencyPhone String?
-  pushNotify     Boolean        @default(true)
-  updateAt       DateTime       @default(now()) @updatedAt
-  houses         House[]
-  notifications  Notification[]
-}
-
-model House {
-  HouseId   String   @id @default(uuid()) @db.Uuid
-  name      String
-  address   String?
-  createdAt DateTime @default(now())
-  userId    String   @db.Uuid
-  updateAt  DateTime @default(now()) @updatedAt
-  user      User     @relation(fields: [userId], references: [UserId])
-  sensors   Sensor[]
-}
-
-model Sensor {
-  name         String
-  type         String
-  createdAt    DateTime     @default(now())
-  SensorNumber String       @id @default(uuid()) @db.Uuid
-  houseId      String       @db.Uuid
-  status       String       @default("normal")
-  isActive     Boolean      @default(true)
-  updateAt     DateTime     @default(now()) @updatedAt
-  eventLogs    EventLog[]
-  house        House        @relation(fields: [houseId], references: [HouseId])
-  sensorData   SensorData[]
-}
-
-model SensorData {
-  SensorDataId String   @id @default(uuid()) @db.Uuid
-  gas          Float?
-  temperature  Float?
-  humidity     Float?
-  smoke        Float?
-  timestamp    DateTime @default(now())
-  sensorId     String   @db.Uuid
-  sensor       Sensor   @relation(fields: [sensorId], references: [SensorNumber])
-}
-
-=======
-  UserId         String         @id @default(uuid()) @db.Uuid
-  password       String
-  email          String         @unique
-  createdAt      DateTime       @default(now())
-  fullName       String
-  emergencyPhone String?
-  pushNotify     Boolean        @default(true)
-  updateAt       DateTime       @default(now()) @updatedAt
-  houses         House[]
-  notifications  Notification[]
-}
-
-model House {
-  HouseId   String   @id @default(uuid()) @db.Uuid
-  name      String
-  address   String?
-  createdAt DateTime @default(now())
-  userId    String   @db.Uuid
-  updateAt  DateTime @default(now()) @updatedAt
-  user      User     @relation(fields: [userId], references: [UserId])
-  sensors   Sensor[]
-}
-
-model Sensor {
-  name         String
-  type         String
-  createdAt    DateTime     @default(now())
-  SensorNumber String       @id @default(uuid()) @db.Uuid
-  houseId      String       @db.Uuid
-  status       String       @default("normal")
-  isActive     Boolean      @default(true)
-  updateAt     DateTime     @default(now()) @updatedAt
-  eventLogs    EventLog[]
-  house        House        @relation(fields: [houseId], references: [HouseId])
-  sensorData   SensorData[]
-}
-
-model SensorData {
-  SensorDataId String   @id @default(uuid()) @db.Uuid
-  gas          Float?
-  temperature  Float?
-  humidity     Float?
-  smoke        Float?
-  timestamp    DateTime @default(now())
-  sensorId     String   @db.Uuid
-  sensor       Sensor   @relation(fields: [sensorId], references: [SensorNumber])
-}
-
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-model EventLog {
-  EventLogId String   @id @default(uuid()) @db.Uuid
-  type       String
-  title      String
-  details    String
-  createdAt  DateTime @default(now())
-  sensorId   String?  @db.Uuid
-  sensor     Sensor?  @relation(fields: [sensorId], references: [SensorNumber])
-}
-
-model Notification {
-  NotificationId String   @id @default(uuid()) @db.Uuid
-  type           String
-  title          String
-  details        String
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  userId         String   @db.Uuid
-  user           User     @relation(fields: [userId], references: [UserId])
-}
-<<<<<<< HEAD
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b

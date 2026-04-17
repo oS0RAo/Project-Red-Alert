@@ -1,6 +1,4 @@
 import express from 'express';
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { prisma } from '../../lib/prisma';
 import { verifyToken } from '../Middleware/authVerify';
 
@@ -121,19 +119,5 @@ router.delete('/sensors/:id', verifyToken, async (req, res) => {
     res.status(500).json({ error: "ลบข้อมูลล้มเหลว" });
   }
 });
-=======
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-import { createSensor, getSensors, updateSensorStatus   } from '../controllers/sensor.js';
-import { authMiddleware } from '../Middleware/auth.js';
-const router = express.Router();
-
-router.post('/createSensor', authMiddleware, createSensor);
-router.get('/sensors/:houseId', authMiddleware, getSensors);
-router.post('/updateSensorStatus/:sensorId', authMiddleware, updateSensorStatus);
-<<<<<<< HEAD
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
 
 export default router;

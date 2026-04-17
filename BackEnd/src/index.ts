@@ -23,8 +23,7 @@ app.get("/test", (req, res) => {
   res.send("Hello, From Prisma API Naraak mak mak!!!");
 });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+
 const routePath = path.join(__dirname, 'routes'); 
 
 readdirSync(routePath).forEach((rf) => {
@@ -38,21 +37,6 @@ readdirSync(routePath).forEach((rf) => {
         console.error(`Fail to load route ${rf}: Not a function`);
     }
 });
-=======
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-const routePath = path.join(__dirname, "routes");
-
-// load routes (ESM)
-for (const rf of readdirSync(routePath)) {
-  const routeFile = path.join(routePath, rf);
-  const route = await import(pathToFileURL(routeFile).href);
-  app.use("/api", route.default);
-}
-<<<<<<< HEAD
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
-=======
->>>>>>> bec6f4d4896842624e87e788103dd9509eedde9b
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
