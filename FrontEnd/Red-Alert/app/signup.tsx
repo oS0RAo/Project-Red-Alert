@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +7,7 @@ import { AppContext } from './_layout';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { apiClient } from '../src/api/client';
 
 // Schema กำหนดกฎของฟอร์ม
 const signupSchema = z.object({
@@ -24,6 +25,9 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupScreen() {
   const { setUserProfile } = useContext(AppContext);
+  
+  // สเตทสำหรับปุ่ม Loading
+  const [isLoading, setIsLoading] = useState(false);
 
   // เรียกใช้งาน useForm และผูกกับ Zod Schema
   const { control, handleSubmit, formState: { errors } } = useForm<SignupFormValues>({
@@ -36,20 +40,48 @@ export default function SignupScreen() {
     }
   });
 
-  // ฟังก์ชันนี้จะทำงานก็ต่อเมื่อข้อมูล "ผ่าน" กฎทั้งหมดแล้วเท่านั้น
-  const onSubmit = (data: SignupFormValues) => {
-    setUserProfile((prev: any) => ({
-      ...prev,
-      name: data.name.trim(),
-      email: data.email.trim()
-    }));
-    router.replace('/houses');
+  const onSubmit = async (data: SignupFormValues) => {
+    setIsLoading(true);
+
+    try {
+      // ยิง API ไปที่ Backend (/register)
+      // ส่งไปแค่ name (เป็น fullName ตาม Backend), email, password
+      const response = await apiClient.post('/register', {
+        fullName: data.name.trim(), // Backend เราใช้ตัวแปร fullName นะครับ
+        email: data.email.trim(),
+        password: data.password,
+      });
+
+      // ถ้าสมัครสำเร็จ อัปเดต Context (ถ้าจำเป็น)
+      setUserProfile((prev: any) => ({
+        ...prev,
+        name: data.name.trim(),
+        email: data.email.trim()
+      }));
+
+      // แจ้งเตือนความสำเร็จแล้วเด้งกลับหน้า Login
+      Alert.alert("สำเร็จ!", "สมัครสมาชิกเรียบร้อยแล้ว กรุณาล็อกอินเข้าสู่ระบบ", [
+        { text: "ตกลง", onPress: () => router.back() } 
+      ]);
+
+    } catch (error: any) {
+      console.error("SignUp Error: ", error);
+      
+      // ดึงข้อความ Error จาก Backend มาแสดง
+      const errorMessage = error.response?.data?.msg 
+                        || error.response?.data?.error 
+                        || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ตรวจสอบ IP/WiFi";
+      
+      Alert.alert("สมัครสมาชิกไม่สำเร็จ", errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} disabled={isLoading}>
         <Ionicons name="chevron-back" size={28} color="#fff" />
       </TouchableOpacity>
 
@@ -76,6 +108,7 @@ export default function SignupScreen() {
                     placeholderTextColor="#888"
                     value={value}
                     onChangeText={onChange}
+                    editable={!isLoading}
                   />
                 </View>
                 {errors.name && <Text style={styles.errorText}>{errors.name.message}</Text>}
@@ -99,6 +132,7 @@ export default function SignupScreen() {
                     autoCapitalize="none"
                     value={value}
                     onChangeText={onChange}
+                    editable={!isLoading}
                   />
                 </View>
                 {errors.email && <Text style={styles.errorText}>{errors.email.message}</Text>}
@@ -121,6 +155,7 @@ export default function SignupScreen() {
                     secureTextEntry
                     value={value}
                     onChangeText={onChange}
+                    editable={!isLoading}
                   />
                 </View>
                 {errors.password && <Text style={styles.errorText}>{errors.password.message}</Text>}
@@ -143,6 +178,7 @@ export default function SignupScreen() {
                     secureTextEntry
                     value={value}
                     onChangeText={onChange}
+                    editable={!isLoading}
                   />
                 </View>
                 {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword.message}</Text>}
@@ -150,15 +186,23 @@ export default function SignupScreen() {
             )}
           />
 
-          {/* กดปุ่มแล้ว handleSubmit ครอบ onSubmit อีกที */}
-          <TouchableOpacity style={styles.signupButton} onPress={handleSubmit(onSubmit)}>
-            <Text style={styles.signupButtonText}>SIGN UP</Text>
+          {/* ปุ่มเ Loading เวลาโหลด */}
+          <TouchableOpacity 
+            style={[styles.signupButton, isLoading && styles.buttonDisabled]} 
+            onPress={handleSubmit(onSubmit)}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.signupButtonText}>SIGN UP</Text>
+            )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} disabled={isLoading}>
             <Text style={styles.loginText}>Login</Text>
           </TouchableOpacity>
         </View>
@@ -208,6 +252,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
+  buttonDisabled: { backgroundColor: '#aa3333', shadowOpacity: 0 },
   signupButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 1 },
   
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },

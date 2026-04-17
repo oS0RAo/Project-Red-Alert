@@ -1,73 +1,112 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../_layout';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useGlobalSearchParams } from 'expo-router';
+import { apiClient } from '../../src/api/client';
 
 const sensorSchema = z.object({
-  id: z.string().min(1, "กรุณากรอก Sensor ID"),
+  serialNumber: z.string().min(1, "กรุณากรอก Sensor ID (เช่น SN-1234)"),
   name: z.string().min(1, "กรุณาตั้งชื่ออุปกรณ์"),
 });
 type SensorFormValues = z.infer<typeof sensorSchema>;
 
 export default function SettingsScreen() {
-  const { sensors, setSensors, logs, setLogs } = useContext(AppContext);
-  const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
+  const { logs, setLogs } = useContext(AppContext);
+  const { houseId } = useGlobalSearchParams();
 
-  // Setup Form
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const { control, handleSubmit, reset, formState: { errors } } = useForm<SensorFormValues>({
     resolver: zodResolver(sensorSchema),
-    defaultValues: { id: '', name: '' }
+    defaultValues: { serialNumber: '', name: '' }
   });
 
+  // ดึงข้อมูล List
+  const fetchSensors = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get(`/houses/${houseId}/sensors`);
+      setSensors(response.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (houseId) fetchSensors();
+  }, [houseId]);
+
+  // ฟังก์ชันลบเซนเซอร์
   const handleDelete = (id: string) => {
-    Alert.alert('ยืนยันการลบ', 'ต้องการลบเซนเซอร์นี้ใช่หรือไม่?', [
+    Alert.alert('ยืนยันการลบ', 'คุณต้องการลบอุปกรณ์นี้ออกจากระบบใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
-      { text: 'ลบ', style: 'destructive', onPress: () => {
-        const sensorName = sensors.find((s:any) => s.id === id)?.name || 'Unknown';
-        setSensors(sensors.filter((s: any) => s.id !== id));
-        
-        const newLog = {
-          id: Date.now().toString(), type: 'info', title: 'Sensor Removed', 
-          room: sensorName, timestamp: new Date().toLocaleTimeString(), 
-          details: `Device ID ${id} was removed from the system.`
-        };
-        setLogs([newLog, ...logs]);
-      }}
+      { 
+        text: 'ลบข้อมูล', 
+        style: 'destructive', 
+        onPress: async () => {
+          try {
+            // ยิง API ไปลบที่ Backend
+            await apiClient.delete(`/sensors/${id}`);
+            
+            // อัปเดต List หน้าจอให้ของหายไปทันทีโดยไม่ต้องโหลดใหม่
+            setSensors(sensors.filter(s => s.id !== id));
+            Alert.alert("สำเร็จ", "ลบอุปกรณ์เรียบร้อยแล้ว");
+          } catch (error) {
+            console.error("Delete error:", error);
+            Alert.alert("ผิดพลาด", "ไม่สามารถลบอุปกรณ์ได้");
+          }
+        }
+      }
     ]);
   };
 
-  const onSubmit = (data: SensorFormValues) => {
-    if (currentView === 'add') {
-      // เช็คข้อมูลซ้ำ
-      if (sensors.some((s: any) => s.id === data.id.trim())) {
-        return Alert.alert('ข้อมูลซ้ำ', 'Sensor ID นี้มีอยู่ในระบบแล้ว');
+  // ฟังก์ชันบันทึกข้อมูลเข้า Database
+  const onSubmit = async (data: SensorFormValues) => {
+    setIsSubmitting(true);
+    try {
+      if (currentView === 'add') {
+        // ยิง API เพิ่มเซนเซอร์
+        const response = await apiClient.post('/sensors', {
+          houseId: String(houseId),
+          serialNumber: data.serialNumber.trim(),
+          name: data.name.trim(),
+          type: "Fire & Gas"
+        });
+        
+        setSensors([...sensors, response.data.sensor]);
+        Alert.alert("สำเร็จ", "เพิ่มอุปกรณ์เรียบร้อยแล้ว");
+      } 
+      else if (currentView === 'edit') {
+        Alert.alert('อัปเดต', 'ฟีเจอร์แก้ไขกำลังพัฒนาใน Backend นะครับ');
       }
-      setSensors([...sensors, { id: data.id.trim(), name: data.name.trim(), status: 'Waiting', temp: 0, gas: 0 }]);
-      
-      const newLog = {
-        id: Date.now().toString(), type: 'info', title: 'Sensor Added', 
-        room: data.name.trim(), timestamp: new Date().toLocaleTimeString(), 
-        details: `Device ID ${data.id.trim()} was successfully connected.`
-      };
-      setLogs([newLog, ...logs]);
-
-    } else if (currentView === 'edit') {
-      setSensors(sensors.map((s: any) => s.id === data.id ? { ...s, name: data.name.trim() } : s));
+      setCurrentView('list');
+    } catch (error: any) {
+      console.error(error);
+      const errorMsg = error.response?.data?.error || "ไม่สามารถจัดการเซนเซอร์ได้";
+      Alert.alert("ล้มเหลว", errorMsg);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setCurrentView('list');
   };
 
   const openAddForm = () => { 
-    reset({ id: '', name: '' }); // ล้างฟอร์ม
+    reset({ serialNumber: '', name: '' }); 
     setCurrentView('add'); 
   };
 
   const openEditForm = (sensor: any) => { 
-    reset({ id: sensor.id, name: sensor.name }); // ยัดข้อมูลเดิมลงฟอร์ม
+    setEditingId(sensor.id);
+    reset({ serialNumber: sensor.serialNumber, name: sensor.name }); 
     setCurrentView('edit'); 
   };
 
@@ -81,34 +120,41 @@ export default function SettingsScreen() {
             <Text style={styles.addBtnText}> Add</Text>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={sensors}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={<Text style={styles.emptyText}>ยังไม่มีเซนเซอร์ในระบบ</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.sensorCard}>
-              <View style={styles.sensorInfo}>
-                <Text style={styles.sensorName}>{item.name}</Text>
-                <Text style={styles.sensorIdLabel}>ID: {item.id}</Text>
+        
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#ff4444" style={{ marginTop: 50 }} />
+        ) : (
+          <FlatList
+            data={sensors}
+            keyExtractor={(item) => item.id}
+            refreshing={isLoading}
+            onRefresh={fetchSensors}
+            ListEmptyComponent={<Text style={styles.emptyText}>ยังไม่มีเซนเซอร์ในระบบ</Text>}
+            renderItem={({ item }) => (
+              <View style={styles.sensorCard}>
+                <View style={styles.sensorInfo}>
+                  <Text style={styles.sensorName}>{item.name}</Text>
+                  <Text style={styles.sensorIdLabel}>SN: {item.serialNumber}</Text>
+                </View>
+                <View style={styles.actionIcons}>
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => openEditForm(item)}>
+                    <Ionicons name="pencil" size={22} color="#3498db" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item.id)}>
+                    <Ionicons name="trash" size={22} color="#ff4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.actionIcons}>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => openEditForm(item)}>
-                  <Ionicons name="pencil" size={22} color="#3498db" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item.id)}>
-                  <Ionicons name="trash" size={22} color="#ff4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        />
+            )}
+          />
+        )}
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentView('list')}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentView('list')} disabled={isSubmitting}>
         <Ionicons name="chevron-back" size={24} color="#ff4444" />
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
@@ -116,18 +162,19 @@ export default function SettingsScreen() {
       <View style={styles.formContainer}>
         <Text style={styles.formHeader}>{currentView === 'add' ? 'Add New Device' : 'Edit Device'}</Text>
         
-        <Text style={styles.label}>Sensor ID {currentView === 'edit' && '(ไม่สามารถแก้ไขได้)'}</Text>
-        <Controller control={control} name="id" render={({ field: { onChange, value } }) => (
+        <Text style={styles.label}>Sensor ID / Serial Number {currentView === 'edit' && '(ไม่สามารถแก้ไขได้)'}</Text>
+        <Controller control={control} name="serialNumber" render={({ field: { onChange, value } }) => (
           <>
             <TextInput 
-              style={[styles.input, currentView === 'edit' && styles.disabledInput, errors.id && styles.inputError]} 
+              style={[styles.input, currentView === 'edit' && styles.disabledInput, errors.serialNumber && styles.inputError]} 
               placeholder="เช่น SN-1234" 
               placeholderTextColor="#666" 
               value={value} 
               onChangeText={onChange} 
-              editable={currentView === 'add'} 
+              editable={currentView === 'add' && !isSubmitting} 
+              autoCapitalize="characters"
             />
-            {errors.id && <Text style={styles.errorText}>{errors.id.message}</Text>}
+            {errors.serialNumber && <Text style={styles.errorText}>{errors.serialNumber.message}</Text>}
           </>
         )} />
         
@@ -140,14 +187,14 @@ export default function SettingsScreen() {
               placeholderTextColor="#666" 
               value={value} 
               onChangeText={onChange} 
-              autoFocus={currentView === 'edit'} 
+              editable={!isSubmitting}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name.message}</Text>}
           </>
         )} />
         
-        <TouchableOpacity style={styles.saveButton} onPress={handleSubmit(onSubmit)}>
-          <Text style={styles.saveButtonText}>{currentView === 'add' ? 'Save Sensor' : 'Update Name'}</Text>
+        <TouchableOpacity style={[styles.saveButton, isSubmitting && {opacity: 0.7}]} onPress={handleSubmit(onSubmit)} disabled={isSubmitting}>
+          {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{currentView === 'add' ? 'Save Sensor' : 'Update Name'}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

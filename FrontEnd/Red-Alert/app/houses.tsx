@@ -1,11 +1,12 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, SafeAreaView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AppContext } from './_layout';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { apiClient } from '../src/api/client';
 
 const houseSchema = z.object({
   name: z.string().min(1, "กรุณาตั้งชื่อบ้าน"),
@@ -16,6 +17,10 @@ type HouseFormValues = z.infer<typeof houseSchema>;
 export default function HouseSelectionScreen() {
   const { houses, setHouses } = useContext(AppContext);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  // State สำหรับจัดการ Loading
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Setup Form
   const { control, handleSubmit, reset, formState: { errors } } = useForm<HouseFormValues>({
@@ -23,15 +28,47 @@ export default function HouseSelectionScreen() {
     defaultValues: { name: '', address: '' }
   });
 
-  const onSubmit = (data: HouseFormValues) => {
-    const newHouse = {
-      id: Date.now().toString(),
-      name: data.name.trim(),
-      address: data.address.trim(),
-      sensors: 0,
-    };
-    setHouses([...houses, newHouse]);
-    closeModal();
+  // ฟังก์ชันดึงข้อมูลบ้านจาก Database
+  const fetchHouses = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get('/houses');
+      setHouses(response.data); // เอาข้อมูลที่ได้จาก API ไปใส่ใน Context
+    } catch (error) {
+      console.error("Fetch houses error:", error);
+      Alert.alert("ข้อผิดพลาด", "ไม่สามารถดึงข้อมูลบ้านได้");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // สั่งให้ดึงข้อมูลทันทีที่เปิดหน้านี้
+  useEffect(() => {
+    fetchHouses();
+  }, []);
+
+  // ฟังก์ชันบันทึกบ้านหลังใหม่ลง Database
+  const onSubmit = async (data: HouseFormValues) => {
+    setIsSubmitting(true);
+    try {
+      const response = await apiClient.post('/houses', {
+        name: data.name.trim(),
+        address: data.address.trim(),
+      });
+
+      // ดึงบ้านใหม่ที่ Backend ตอบกลับมา ไปต่อท้าย List เดิม (ไม่ต้องโหลดใหม่ทั้งหน้า)
+      const newHouse = response.data.house;
+      setHouses([...houses, newHouse]);
+      
+      closeModal();
+      Alert.alert("สำเร็จ", "เพิ่มบ้านหลังใหม่เรียบร้อยแล้ว!");
+    } catch (error: any) {
+      console.error("Create house error:", error);
+      const errorMsg = error.response?.data?.error || "ไม่สามารถเพิ่มบ้านได้ ลองใหม่อีกครั้ง";
+      Alert.alert("ล้มเหลว", errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const closeModal = () => {
@@ -52,25 +89,41 @@ export default function HouseSelectionScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={houses}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={<Text style={{color: '#888', textAlign: 'center', marginTop: 50}}>No houses found. Please add one.</Text>}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.houseCard} onPress={() => router.replace('/(tabs)/dashboard')}>
-            <View>
-              <Text style={styles.houseName}>{item.name}</Text>
-              <Text style={styles.houseAddress}>{item.address}</Text>
-            </View>
-            <View style={styles.sensorStatus}>
-              <Text style={styles.sensorText}>{item.sensors} SENSOR{item.sensors > 1 ? 'S' : ''}</Text>
-              <View style={styles.statusDot} />
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+      {/* เช็คว่ากำลังโหลดอยู่ไหม ถ้าโหลดให้แสดงวงกลมหมุน */}
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#ff4444" />
+          <Text style={{ color: '#888', marginTop: 10 }}>Loading houses...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={houses}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          // Pull-to-refresh เอานิ้วปัดจอลงเพื่อโหลดข้อมูลใหม่
+          refreshing={isLoading}
+          onRefresh={fetchHouses}
+          ListEmptyComponent={<Text style={{color: '#888', textAlign: 'center', marginTop: 50}}>No properties found. Tap + to add one.</Text>}
+          renderItem={({ item }) => {
+            // Prisma ส่งจำนวนเซนเซอร์มาในก้อน _count.sensors (ถ้าเพิ่งสร้างใหม่จะดึงมาจาก 0)
+            const sensorCount = item._count?.sensors || 0;
+            return (
+              <TouchableOpacity style={styles.houseCard} onPress={() => router.push({ pathname: '/dashboard', params: { houseId: item.id, houseName: item.name }})}>
+                <View>
+                  <Text style={styles.houseName}>{item.name}</Text>
+                  <Text style={styles.houseAddress}>{item.address || "ไม่ได้ระบุที่อยู่"}</Text>
+                </View>
+                <View style={styles.sensorStatus}>
+                  <Text style={styles.sensorText}>{sensorCount} SENSOR{sensorCount !== 1 ? 'S' : ''}</Text>
+                  <View style={[styles.statusDot, sensorCount === 0 ? { backgroundColor: '#888' } : {}]} />
+                </View>
+              </TouchableOpacity>
+            )
+          }}
+        />
+      )}
 
+      {/* Modal เพิ่มบ้าน */}
       <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={closeModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -78,23 +131,48 @@ export default function HouseSelectionScreen() {
 
             <Controller control={control} name="name" render={({ field: { onChange, value } }) => (
               <>
-                <TextInput style={[styles.input, errors.name && styles.inputError]} placeholder="House Name..." placeholderTextColor="#888" value={value} onChangeText={onChange} />
+                <TextInput 
+                  style={[styles.input, errors.name && styles.inputError]} 
+                  placeholder="House Name (e.g. บ้านแสนสุข)..." 
+                  placeholderTextColor="#888" 
+                  value={value} 
+                  onChangeText={onChange} 
+                  editable={!isSubmitting}
+                />
                 {errors.name && <Text style={styles.errorText}>{errors.name.message}</Text>}
               </>
             )} />
 
             <Controller control={control} name="address" render={({ field: { onChange, value } }) => (
               <>
-                <TextInput style={[styles.input, styles.textArea, errors.address && styles.inputError]} placeholder="Address..." placeholderTextColor="#888" multiline={true} numberOfLines={4} value={value} onChangeText={onChange} />
+                <TextInput 
+                  style={[styles.input, styles.textArea, errors.address && styles.inputError]} 
+                  placeholder="Address..." 
+                  placeholderTextColor="#888" 
+                  multiline={true} 
+                  numberOfLines={4} 
+                  value={value} 
+                  onChangeText={onChange} 
+                  editable={!isSubmitting}
+                />
                 {errors.address && <Text style={styles.errorText}>{errors.address.message}</Text>}
               </>
             )} />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleSubmit(onSubmit)}>
-                <Text style={styles.btnText}>Confirm</Text>
+              <TouchableOpacity 
+                style={[styles.confirmBtn, isSubmitting && { opacity: 0.7 }]} 
+                onPress={handleSubmit(onSubmit)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Confirm</Text>}
               </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+              
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={closeModal}
+                disabled={isSubmitting}
+              >
                 <Text style={styles.btnText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -112,7 +190,7 @@ const styles = StyleSheet.create({
   logoRed: { fontSize: 26, fontWeight: '900', color: '#ff4444', fontStyle: 'italic' },
   logoWhite: { fontSize: 26, fontWeight: '900', color: '#ffffff', fontStyle: 'italic' },
   addButton: { backgroundColor: '#ff4444', borderRadius: 12, width: 45, height: 45, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: 20 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 50 },
   houseCard: { backgroundColor: '#1e1e1e', borderRadius: 15, padding: 20, marginBottom: 20, minHeight: 120, justifyContent: 'space-between', borderLeftWidth: 5, borderLeftColor: '#ff4444' },
   houseName: { color: '#ffffff', fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
   houseAddress: { color: '#888888', fontSize: 14, lineHeight: 20 },

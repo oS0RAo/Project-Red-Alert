@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { apiClient } from '../src/api/client';
+import * as SecureStore from 'expo-secure-store';
 import * as z from 'zod';
 
 // Schema เช็คข้อมูล Login
@@ -20,9 +22,38 @@ export default function LoginScreen() {
     defaultValues: { email: '', password: '' }
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    // ข้อมูลผ่านกฎแล้ว (ในอนาคตเอา data.email, data.password ไปยิง Firebase ตรงนี้)
-    router.replace('/houses'); 
+  const [isLoading, setIsLoading] = useState(false);
+
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
+
+    try {
+      // ยิงข้อมูลไปที่ Backend
+      const response = await apiClient.post('/login', {
+        email: data.email,
+        password: data.password,
+      });
+
+      // ถ้า Backend ตอบกลับมาสำเร็จ ดึง Token และข้อมูลออกมา
+      const { token, user } = response.data;
+
+      // เก็บ Token ลงมือถือ
+      await SecureStore.setItemAsync('userToken', token);
+      await SecureStore.setItemAsync('userData', JSON.stringify(user));
+      router.replace('/houses'); 
+
+    } catch (error: any) {
+      console.error("Login Error: ", error);
+      
+      // ดักจับ Error Message ที่เราเขียนไว้ใน Backend (เช่น "User not found")
+      const errorMessage = error.response?.data?.msg 
+                        || error.response?.data?.error 
+                        || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ตรวจสอบ IP/WiFi";
+      
+      Alert.alert("เข้าสู่ระบบล้มเหลว", errorMessage);
+    } finally {
+      setIsLoading(false); // หยุดหมุนไม่ว่าจะสำเร็จหรือพัง
+    }
   };
 
   return (

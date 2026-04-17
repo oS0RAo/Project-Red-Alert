@@ -1,22 +1,50 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Dimensions, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Dimensions, Linking, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../_layout';
+import { useGlobalSearchParams } from 'expo-router';
+import { apiClient } from '../../src/api/client';
 
 export default function DashboardScreen() {
-  const { sensors } = useContext(AppContext);
   const { userProfile } = useContext(AppContext);
+  const { houseId } = useGlobalSearchParams(); 
   
-  const [activeTab, setActiveTab] = useState(sensors[0]?.id || null);
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
 
-  useEffect(() => {
-    if (sensors.length > 0 && !sensors.find((s: any) => s.id === activeTab)) {
-      setActiveTab(sensors[0].id);
+  // ดึงข้อมูลเซนเซอร์จาก Backend
+  const fetchSensors = async () => {
+    if (!houseId) return;
+    
+    try {
+      const response = await apiClient.get(`/houses/${houseId}/sensors`);
+      setSensors(response.data);
+      
+      // ถ้ายังไม่มีการเลือก Tab ให้เลือกอันแรกอัตโนมัติ
+      if (response.data.length > 0 && !activeTab) {
+        setActiveTab(response.data[0].id);
+      }
+    } catch (error: any) {
+      // ถ้าเจอ 401 (Unauthorized) ให้เด้งไปหน้า Login หรือแจ้งเตือน
+      if (error.response?.status === 401) {
+        console.error("Session expired, please login again");
+      }
+      console.error("Fetch sensors error:", error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [sensors, activeTab]);
+  };
 
-  const currentSensor = sensors.length > 0 ? (sensors.find((s: any) => s.id === activeTab) || sensors[0]) : null;
+  // ดึงข้อมูลตอนเปิดหน้า และตั้ง Refresh ไว้ทุกๆ 5 วินาที (เพื่อให้ค่าอัปเดต Real-time)
+  useEffect(() => {
+    fetchSensors();
+    const interval = setInterval(fetchSensors, 5000); 
+    return () => clearInterval(interval);
+  }, [houseId]);
+
+  const currentSensor = sensors.find((s: any) => s.id === activeTab) || null;
 
   useEffect(() => {
     if (currentSensor?.status === 'Danger') {
@@ -32,9 +60,18 @@ export default function DashboardScreen() {
   }, [currentSensor?.status, pulseAnim]);
 
   const handleEmergencyCall = () => {
-    const phone = userProfile.emergencyPhone || '199';
+    const phone = userProfile?.emergencyPhone || '199';
     Linking.openURL(`tel:${phone}`);
   };
+
+  if (isLoading && sensors.length === 0) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#ff4444" />
+        <Text style={{ color: '#888', marginTop: 10 }}>Loading sensors...</Text>
+      </View>
+    );
+  }
 
   if (!sensors || sensors.length === 0 || !currentSensor) {
     return (
@@ -46,19 +83,21 @@ export default function DashboardScreen() {
   }
 
   const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'Normal': return { color: '#2ecc71', icon: 'shield-checkmark', text: 'SAFE & CLEAR' };
-      case 'Cooking': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING SMOKE' };
-      case 'Danger': return { color: '#ff4444', icon: 'warning', text: 'FIRE / GAS LEAK' };
-      case 'Waiting': return { color: '#3498db', icon: 'sync', text: 'NO DATA' };
+    switch (status?.toLowerCase()) {
+      case 'online':
+      case 'active': return { color: '#2ecc71', icon: 'shield-checkmark', text: 'SAFE & CLEAR' };
+      case 'warning': return { color: '#f1c40f', icon: 'restaurant', text: 'COOKING SMOKE' };
+      case 'danger': return { color: '#ff4444', icon: 'warning', text: 'FIRE / GAS LEAK' };
+      case 'waiting': return { color: '#3498db', icon: 'sync', text: 'NO DATA' };
       default: return { color: '#888', icon: 'help-circle', text: 'UNKNOWN' };
     }
   };
 
   const statusConfig = getStatusConfig(currentSensor.status);
-  
-  // เช็คว่าเป็นสถานะรอข้อมูลไหม
-  const isWaiting = currentSensor.status === 'Waiting';
+  const isWaiting = currentSensor.status?.toLowerCase() === 'waiting';
+
+  const tempValue = currentSensor.temp || 0;
+  const gasValue = currentSensor.gas || 0;
 
   return (
     <View style={styles.container}>
@@ -78,7 +117,7 @@ export default function DashboardScreen() {
           <Animated.View style={[styles.statusCircle, { borderColor: statusConfig.color, shadowColor: statusConfig.color }, currentSensor.status === 'Danger' && { transform: [{ scale: pulseAnim }] }]}>
             <Ionicons name={statusConfig.icon as any} size={60} color={statusConfig.color} />
             <Text style={[styles.statusMainText, { color: statusConfig.color }]}>{statusConfig.text}</Text>
-            <Text style={styles.statusSubText}>AI Classification</Text>
+            <Text style={styles.statusSubText}>System Status</Text>
           </Animated.View>
         </View>
 
@@ -86,11 +125,11 @@ export default function DashboardScreen() {
           {/* อุณหภูมิ */}
           <View style={styles.dataCard}>
             <View style={styles.cardHeader}><Ionicons name="thermometer" size={20} color={isWaiting ? '#666' : '#ff7675'} /><Text style={styles.cardTitle}>Temperature</Text></View>
-            <Text style={styles.dataValue}>{isWaiting ? '-- ' : currentSensor.temp}<Text style={styles.dataUnit}>°C</Text></Text>
+            <Text style={styles.dataValue}>{isWaiting ? '-- ' : tempValue}<Text style={styles.dataUnit}>°C</Text></Text>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { 
-                width: `${isWaiting ? 0 : Math.min(currentSensor.temp * 1.5, 100)}%`, 
-                backgroundColor: currentSensor.temp > 50 && !isWaiting ? '#ff4444' : '#2ecc71' 
+                width: `${isWaiting ? 0 : Math.min(tempValue * 1.5, 100)}%`, 
+                backgroundColor: tempValue > 50 && !isWaiting ? '#ff4444' : '#2ecc71' 
               }]} />
             </View>
           </View>
@@ -98,11 +137,11 @@ export default function DashboardScreen() {
           {/* แก๊ส */}
           <View style={styles.dataCard}>
             <View style={styles.cardHeader}><Ionicons name="cloud-outline" size={20} color={isWaiting ? '#666' : '#74b9ff'} /><Text style={styles.cardTitle}>Gas Level</Text></View>
-            <Text style={styles.dataValue}>{isWaiting ? '-- ' : currentSensor.gas}<Text style={styles.dataUnit}> PPM</Text></Text>
+            <Text style={styles.dataValue}>{isWaiting ? '-- ' : gasValue}<Text style={styles.dataUnit}> PPM</Text></Text>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { 
-                width: `${isWaiting ? 0 : Math.min(currentSensor.gas / 10, 100)}%`, 
-                backgroundColor: currentSensor.gas > 400 && !isWaiting ? '#ff4444' : '#2ecc71' 
+                width: `${isWaiting ? 0 : Math.min(gasValue / 10, 100)}%`, 
+                backgroundColor: gasValue > 400 && !isWaiting ? '#ff4444' : '#2ecc71' 
               }]} />
             </View>
           </View>
@@ -110,7 +149,7 @@ export default function DashboardScreen() {
 
         <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
           <Ionicons name="call" size={24} color="#fff" />
-          <Text style={styles.emergencyText}>CALL EMERGENCY ({userProfile.emergencyPhone})</Text>
+          <Text style={styles.emergencyText}>CALL EMERGENCY</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -118,7 +157,6 @@ export default function DashboardScreen() {
 }
 
 const { width } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
   scrollContent: { padding: 20, paddingBottom: 40 },
