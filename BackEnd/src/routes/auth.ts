@@ -7,4 +7,4 @@ const router = express.Router();
 router.post('/register', registerMiddleware, register);
 router.post('/login', loginMiddleware, login);
 
-module.exports = router;
+export default router;

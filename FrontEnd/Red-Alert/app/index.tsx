@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { apiClient } from '../src/api/client';
 import * as SecureStore from 'expo-secure-store';
 import * as z from 'zod';
+import { AppContext } from './_layout'; 
 
 // Schema เช็คข้อมูล Login
 const loginSchema = z.object({
@@ -17,6 +19,9 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+  // ดึง setUserProfile มาใช้งาน
+  const { setUserProfile } = useContext(AppContext);
+
   const { control, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' }
@@ -40,12 +45,16 @@ export default function LoginScreen() {
       // เก็บ Token ลงมือถือ
       await SecureStore.setItemAsync('userToken', token);
       await SecureStore.setItemAsync('userData', JSON.stringify(user));
+      
+      // นำข้อมูล User จาก Backend ไปเก็บใน Context ให้ทั้งระบบรู้จัก
+      setUserProfile(user);
+
       router.replace('/houses'); 
 
     } catch (error: any) {
       console.error("Login Error: ", error);
       
-      // ดักจับ Error Message ที่เราเขียนไว้ใน Backend (เช่น "User not found")
+      // ดักจับ Error Message ที่เราเขียนไว้ใน Backend เช่น "User not found"
       const errorMessage = error.response?.data?.msg 
                         || error.response?.data?.error 
                         || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ตรวจสอบ IP/WiFi";
@@ -90,12 +99,8 @@ export default function LoginScreen() {
             </>
           )} />
 
-          <TouchableOpacity style={styles.forgotPassword}>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.loginButton} onPress={handleSubmit(onSubmit)}>
-            <Text style={styles.loginButtonText}>LOGIN</Text>
+          <TouchableOpacity style={styles.loginButton} onPress={handleSubmit(onSubmit)} disabled={isLoading}>
+            <Text style={styles.loginButtonText}>{isLoading ? "LOGGING IN..." : "LOGIN"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -123,8 +128,6 @@ const styles = StyleSheet.create({
   errorText: { color: '#ff4444', fontSize: 12, marginBottom: 15, marginLeft: 5 },
   icon: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 18, color: '#fff', fontSize: 16 },
-  forgotPassword: { alignSelf: 'flex-end', marginBottom: 20 },
-  forgotText: { color: '#aaa', fontSize: 14 },
   loginButton: { backgroundColor: '#ff4444', paddingVertical: 18, borderRadius: 12, alignItems: 'center', marginTop: 10, shadowColor: '#ff4444', shadowOpacity: 0.3, shadowRadius: 10 },
   loginButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 1 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },

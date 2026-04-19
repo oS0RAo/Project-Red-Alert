@@ -10,7 +10,9 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarStyle: { backgroundColor: '#1e1e1e', borderTopColor: '#333', height: 60, paddingBottom: 8, paddingTop: 8 },
+        tabBarStyle: { 
+          backgroundColor: '#1e1e1e', borderTopColor: '#333', height: 60 + insets.bottom, paddingBottom: insets.bottom > 0 ? insets.bottom : 8, paddingTop: 8 
+        },
         tabBarActiveTintColor: '#ff4444', tabBarInactiveTintColor: '#888',
         header: ({ options }) => (
           <View style={{ backgroundColor: '#121212', paddingTop: insets.top + 15, paddingHorizontal: 20, paddingBottom: 15 }}>

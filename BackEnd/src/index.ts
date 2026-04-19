@@ -1,43 +1,32 @@
-import express from "express";
-import { prisma } from "../lib/prisma.js";
-import { config } from "dotenv";
-import { readdirSync } from "fs";
-import cors from "cors";
-import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import authRoutes from './routes/auth';
+import houseRoutes from './routes/house';
+import sensorRoutes from './routes/sensor';
+import historyRoutes from './routes/history';
+import userRoutes from './routes/user';
 
-config({ path: path.join(__dirname, "../.env") });
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-const jwtSecret = process.env.JWT_SECRET;
-const geminiApiKey = process.env.GEMINI_API_KEY;
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/test", (req, res) => {
-  res.send("Hello, From Prisma API Naraak mak mak!!!");
+app.get('/test', (req, res) => {
+    res.send('Hello, From Prisma API!');
 });
 
-
-const routePath = path.join(__dirname, 'routes'); 
-
-readdirSync(routePath).forEach((rf) => {
-    const route = require(path.join(routePath, rf));
-    const routerHandler = route.default || route;
-    
-    if (typeof routerHandler === 'function') {
-        app.use('/api', routerHandler);
-        console.log(`Loaded route: ${rf}`);
-    } else {
-        console.error(`Fail to load route ${rf}: Not a function`);
-    }
-});
+app.use('/api', authRoutes);
+app.use('/api', houseRoutes);
+app.use('/api', sensorRoutes);
+app.use('/api', historyRoutes);
+app.use('/api/user', userRoutes);
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+    console.log(`Server is running on http://localhost:${port}`);
 });

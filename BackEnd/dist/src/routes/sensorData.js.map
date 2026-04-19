@@ -1,0 +1,1 @@
+{"version":3,"file":"sensorData.js","sourceRoot":"","sources":["../../../src/routes/sensorData.ts"],"names":[],"mappings":"AAAA,OAAO,OAAO,MAAM,SAAS,CAAC;AAC9B,OAAO,EAAE,gBAAgB,EAAE,MAAM,8BAA8B,CAAC;AAChE,OAAO,EAAE,cAAc,EAAE,MAAM,uBAAuB,CAAC;AACvD,MAAM,MAAM,GAAG,OAAO,CAAC,MAAM,EAAE,CAAC;AAEhC,MAAM,CAAC,IAAI,CAAC,mBAAmB,EAAE,cAAc,EAAE,gBAAgB,CAAC,CAAC;AAEnE,eAAe,MAAM,CAAC"}

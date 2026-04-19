@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const BACKEND_URL = 'http://10.206.75.238:5000/api'; 
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || ''; 
 
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,

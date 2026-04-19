@@ -1,26 +1,15 @@
 import express from 'express';
-import { prisma } from '../../lib/prisma';
-import { verifyToken } from '../Middleware/authVerify';
+import { list, remove, getProfile, updateProfile, savePushToken } from '../controllers/user.js'; 
+import { verifyToken } from '../Middleware/authVerify.js';
 
 const router = express.Router();
 
-router.put('/profile', verifyToken, async (req: any, res) => {
-  try {
-    const { emergencyPhone, pushNotify } = req.body;
-    const userId = req.user.UserId;
+router.get('/list', verifyToken, list);
+router.delete('/remove/:UserId', verifyToken, remove);
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { 
-        emergencyPhone, 
-        pushNotify 
-      }
-    });
+router.get('/profile', verifyToken, getProfile);
+router.put('/profile', verifyToken, updateProfile);
 
-    res.json({ msg: "อัปเดตเบอร์ติดต่อฉุกเฉินสำเร็จ" });
-  } catch (error) {
-    res.status(500).json({ error: "ไม่สามารถอัปเดตโปรไฟล์ได้" });
-  }
-});
+router.put('/push-token', verifyToken, savePushToken);
 
 export default router;

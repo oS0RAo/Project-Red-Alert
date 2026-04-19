@@ -1,13 +1,13 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, Switch, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../_layout';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { apiClient } from '../../src/api/client'; 
 
-// Schema ล็อคเบอร์โทรศัพท์ (ห้ามเว้นว่าง, ต้องเป็นตัวเลขล้วน, ความยาวขั้นต่ำ 3 ตัว)
 const phoneSchema = z.object({
   emergencyPhone: z.string()
     .min(3, "เบอร์โทรฉุกเฉินสั้นเกินไป")
@@ -20,22 +20,24 @@ export default function UserScreen() {
   
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'emergency' | 'notify'>('emergency');
+  const [pushNotify, setPushNotify] = useState(userProfile?.pushNotify ?? true);
+  
+  // State สำหรับกันคนกดย้ำตอนกำลังโหลดบันทึก
+  const [isLoading, setIsLoading] = useState(false);
 
-  // State สำหรับหน้าตั้งค่าแจ้งเตือน
-  const [pushNotify, setPushNotify] = useState(userProfile.pushNotify);
-
-  // Setup Form สำหรับเบอร์ฉุกเฉิน
   const { control, handleSubmit, reset, formState: { errors } } = useForm<PhoneFormValues>({
     resolver: zodResolver(phoneSchema),
-    defaultValues: { emergencyPhone: userProfile.emergencyPhone }
+    defaultValues: { emergencyPhone: userProfile?.emergencyPhone || '' }
   });
 
-  // อัปเดตค่าเริ่มต้นให้ฟอร์มเวลา userProfile โหลดมาครั้งแรก
   useEffect(() => {
-    reset({ emergencyPhone: userProfile.emergencyPhone });
-  }, [userProfile.emergencyPhone, reset]);
+    reset({ emergencyPhone: userProfile?.emergencyPhone || '' });
+  }, [userProfile?.emergencyPhone, reset]);
 
-  const getInitial = () => userProfile.name ? userProfile.name.charAt(0).toUpperCase() : '?';
+  const getInitial = () => {
+    const nameToUse = userProfile?.fullName || userProfile?.name;
+    return nameToUse ? nameToUse.charAt(0).toUpperCase() : '?';
+  };
 
   const handleLogout = () => {
     Alert.alert("ยืนยันการออกจากระบบ", "คุณต้องการออกจากระบบ Red Alert ใช่หรือไม่?", [
@@ -44,6 +46,7 @@ export default function UserScreen() {
         setHouses([]);
         setSensors([]);
         setLogs([]);
+        setUserProfile({}); 
         router.replace('/'); 
       }}
     ]);
@@ -52,25 +55,53 @@ export default function UserScreen() {
   const openModal = (type: 'emergency' | 'notify') => {
     setModalType(type);
     if (type === 'emergency') {
-      reset({ emergencyPhone: userProfile.emergencyPhone }); // ดึงเบอร์ล่าสุดมาใส่ฟอร์ม
+      reset({ emergencyPhone: userProfile?.emergencyPhone || '' });
     } else {
-      setPushNotify(userProfile.pushNotify); // ดึงค่าการแจ้งเตือนล่าสุด
+      setPushNotify(userProfile?.pushNotify ?? true);
     }
     setModalVisible(true);
   };
 
-  // ฟังก์ชันเซฟเบอร์โทรจะถูกเรียกเมื่อผ่านกฎ Zod แล้ว
-  const onSavePhone = (data: PhoneFormValues) => {
-    setUserProfile({ ...userProfile, emergencyPhone: data.emergencyPhone });
-    setModalVisible(false);
-    Alert.alert("Success", "อัปเดตเบอร์ฉุกเฉินเรียบร้อยแล้ว!");
+  // ฟังก์ชันบันทึกเบอร์โทรยิง API ไปหลังบ้าน
+  const onSavePhone = async (data: PhoneFormValues) => {
+    setIsLoading(true);
+    try {
+      // ส่งไปอัปเดตที่ API โดยส่งค่า pushNotify เดิมไปด้วยเพื่อไม่ให้ค่าหาย
+      await apiClient.put('/user/profile', {
+        emergencyPhone: data.emergencyPhone,
+        pushNotify: userProfile.pushNotify 
+      });
+      
+      setUserProfile({ ...userProfile, emergencyPhone: data.emergencyPhone });
+      setModalVisible(false);
+      Alert.alert("Success", "อัปเดตเบอร์ฉุกเฉินเรียบร้อยแล้ว!");
+    } catch (error) {
+      console.log("Update Phone Error:", error);
+      Alert.alert("Error", "ไม่สามารถบันทึกเบอร์โทรได้ กรุณาลองใหม่");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // ฟังก์ชันเซฟการแจ้งเตือน
-  const saveNotifyConfig = () => {
-    setUserProfile({ ...userProfile, pushNotify });
-    setModalVisible(false);
-    Alert.alert("Success", "อัปเดตการตั้งค่าแจ้งเตือนเรียบร้อยแล้ว!");
+  // ฟังก์ชันเซฟการแจ้งเตือนยิง API ไปหลังบ้าน
+  const saveNotifyConfig = async () => {
+    setIsLoading(true);
+    try {
+      // ส่งไปอัปเดตที่ API โดยส่งค่าเบอร์เดิมไปด้วย
+      await apiClient.put('/user/profile', {
+        emergencyPhone: userProfile.emergencyPhone,
+        pushNotify: pushNotify
+      });
+
+      setUserProfile({ ...userProfile, pushNotify });
+      setModalVisible(false);
+      Alert.alert("Success", "อัปเดตการตั้งค่าแจ้งเตือนเรียบร้อยแล้ว!");
+    } catch (error) {
+      console.log("Update Notify Error:", error);
+      Alert.alert("Error", "ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองใหม่");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -79,8 +110,8 @@ export default function UserScreen() {
         <View style={styles.avatarPlaceholder}>
           <Text style={styles.avatarText}>{getInitial()}</Text>
         </View> 
-        <Text style={styles.userName}>{userProfile.name}</Text>
-        <Text style={styles.userEmail}>{userProfile.email}</Text>
+        <Text style={styles.userName}>{userProfile?.fullName || userProfile?.name || "กำลังโหลด..."}</Text>
+        <Text style={styles.userEmail}>{userProfile?.email}</Text>
       </View>
 
       <View style={styles.menuSection}>
@@ -89,7 +120,7 @@ export default function UserScreen() {
             <Ionicons name="call" size={20} color="#ff4444" style={{ marginRight: 15 }} />
             <Text style={styles.menuText}>Emergency Contacts</Text>
           </View>
-          <Text style={styles.menuValue}>{userProfile.emergencyPhone}</Text>
+          <Text style={styles.menuValue}>{userProfile?.emergencyPhone || 'ยังไม่ได้ตั้งค่า'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => openModal('notify')}>
@@ -97,7 +128,8 @@ export default function UserScreen() {
             <Ionicons name="notifications" size={20} color="#f1c40f" style={{ marginRight: 15 }} />
             <Text style={styles.menuText}>Notification Preferences</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#666" />
+          {/* แสดงสถานะว่าเปิดหรือปิดอยู่ */}
+          <Text style={styles.menuValue}>{userProfile?.pushNotify ? 'เปิด' : 'ปิด'}</Text>
         </TouchableOpacity>
       </View>
       
@@ -109,14 +141,12 @@ export default function UserScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {modalType === 'emergency' ? '📞 Emergency Contact' : '🔔 Notification Config'}
+              {modalType === 'emergency' ? 'Emergency Contact' : 'Notification Config'}
             </Text>
 
             {modalType === 'emergency' ? (
               <View style={{ width: '100%' }}>
                 <Text style={styles.label}>Phone Number (เบอร์ฉุกเฉิน)</Text>
-                
-                {/* ใช้ Controller ครอบช่องกรอกเบอร์โทร */}
                 <Controller
                   control={control}
                   name="emergencyPhone"
@@ -145,22 +175,22 @@ export default function UserScreen() {
             )}
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} disabled={isLoading}>
                 <Text style={styles.btnText}>Cancel</Text>
               </TouchableOpacity>
               
-              {/* แยกว่าปุ่ม Save จะรันคำสั่งไหน ขึ้นอยู่กับประเภท Modal */}
               <TouchableOpacity 
-                style={styles.saveBtn} 
+                style={[styles.saveBtn, isLoading && { opacity: 0.7 }]} // 🟢 หรี่แสงปุ่มตอนโหลด
                 onPress={modalType === 'emergency' ? handleSubmit(onSavePhone) : saveNotifyConfig}
+                disabled={isLoading} // 🟢 ล็อคปุ่มตอนโหลด
               >
-                <Text style={styles.btnText}>Save</Text>
+                {/* แสดงวงแหวนโหลด หรือ ข้อความ Save */}
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
